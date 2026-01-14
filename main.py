@@ -2,34 +2,19 @@ import pandas as pd
 from model.scheduler import solve_schedule
 import os
 
-def parse_markdown_table(file_path):
-    with open(file_path, 'r', encoding='utf-8') as f:
-        lines = f.readlines()
-    
-    # Filter out separator lines and empty lines
-    table_lines = [l.strip() for l in lines if '|' in l and '---' not in l]
-    if not table_lines:
-        return pd.DataFrame()
-    
-    # Header
-    header = [c.strip() for c in table_lines[0].split('|') if c.strip()]
-    data = []
-    for line in table_lines[1:]:
-        cols = [c.strip() for c in line.split('|') if c.strip()]
-        if len(cols) == len(header):
-            data.append(cols)
-            
-    return pd.DataFrame(data, columns=header)
-
 def main():
-    txt_path = os.path.join('data', 'cursos.txt')
-    if not os.path.exists(txt_path):
-        print(f"Error: {txt_path} no encontrado.")
+    csv_path = os.path.join('data', 'input-courses.csv')
+    if not os.path.exists(csv_path):
+        print(f"Error: {csv_path} no encontrado.")
         return
 
-    df = parse_markdown_table(txt_path)
+    try:
+        df = pd.read_csv(csv_path, sep=';', encoding='utf-8')
+    except UnicodeDecodeError:
+        df = pd.read_csv(csv_path, sep=';', encoding='latin-1')
+
     if df.empty:
-        print("Error: No se pudo parsear la tabla de cursos.")
+        print("Error: El archivo CSV está vacío.")
         return
 
     # Data cleaning
@@ -37,36 +22,44 @@ def main():
     df['Prioridad'] = pd.to_numeric(df['Prioridad'], errors='coerce')
     df = df.dropna(subset=['Curso', 'Horas', 'Prioridad'])
     
-    # Map 'Prioridad' column to 'PRIORIDAD' for the solver
-    df['PRIORIDAD'] = df['Prioridad'].astype(int)
-
-    print("--- Optimizador de Horarios v2.1 ---")
-    print(f"Cargados {len(df)} cursos.")
+    print("--- Optimizador de Horarios v3 ---")
+    print(f"Cargadas {len(df)} filas de datos.")
     
     results = solve_schedule(df)
     
-    print("\n" + "="*30)
-    print("RESULTADO DE LA OPTIMIZACIÓN")
-    print("="*30)
+    # Prepare Output String
+    output_lines = []
+    output_lines.append("="*30)
+    output_lines.append("RESULTADO DE LA OPTIMIZACIÓN")
+    output_lines.append("="*30)
     
     for account in ['account1', 'account2']:
         acc_name = "CUENTA 1" if account == 'account1' else "CUENTA 2"
         items = results[account]
-        print(f"\n{acc_name} ({len(items)} cursos):")
+        output_lines.append(f"\n{acc_name} ({len(items)} cursos):")
         items.sort(key=lambda x: (x['priority'], x['name']))
         for item in items:
-            print(f"  [{item['id']}] {item['name']}")
+            output_lines.append(f"  [{item['id']}] {item['name']} (Prioridad {item['priority']})")
         
     if results['unassigned']:
-        print(f"\nCURSOS NO ASIGNADOS ({len(results['unassigned'])} cursos):")
+        output_lines.append(f"\nCURSOS NO ASIGNADOS ({len(results['unassigned'])} cursos):")
         items = results['unassigned']
         items.sort(key=lambda x: (x['priority'], x['name']))
         for item in items:
-            print(f"  [{item['id']}] {item['name']}")
+            output_lines.append(f"  [{item['id']}] {item['name']} (Prioridad {item['priority']})")
     else:
-        print("\n¡Todos los cursos han sido asignados!")
+        output_lines.append("\n¡Todos los cursos han sido asignados!")
 
-    print("\n" + "="*30)
+    output_lines.append("\n" + "="*30)
+    
+    report = "\n".join(output_lines)
+    print(report)
+    
+    # Save to data directory
+    output_path = os.path.join('data', 'optimization_result.txt')
+    with open(output_path, 'w', encoding='utf-8') as f:
+        f.write(report)
+    print(f"\nResultado guardado en: {output_path}")
 
 if __name__ == "__main__":
     main()
