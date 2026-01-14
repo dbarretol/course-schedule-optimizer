@@ -142,7 +142,9 @@ def solve_schedule(df):
     objective_terms = []
     for i in range(num_courses):
         prio = courses_to_solve[i]['priority']
-        weight = 10 ** (max_p - prio)
+        # Using a base of 100 ensures that up to 99 courses of lower priority 
+        # cannot outweigh a single course of the immediately higher priority.
+        weight = 100 ** (max_p - prio)
         objective_terms.append(y[i] * weight)
         
     model.Maximize(sum(objective_terms))
