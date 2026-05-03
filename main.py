@@ -5,6 +5,15 @@ import logging
 from model.scheduler import solve_schedule
 from model.config import INPUT_FILE, REQUIRED_COLUMNS, NUM_ACCOUNTS
 
+# Configuración de logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s [%(levelname)s] %(message)s',
+    handlers=[
+        logging.StreamHandler(),
+        logging.FileHandler('scheduler.log', encoding='utf-8')
+    ]
+)
 logger = logging.getLogger(__name__)
 
 
