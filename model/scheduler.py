@@ -2,6 +2,7 @@ import pandas as pd
 from datetime import datetime, timedelta, time
 from ortools.sat.python import cp_model
 import re
+from model.config import NUM_ACCOUNTS, SOLVER_TIMEOUT, MAX_DAYS_AHEAD, LEXICOGRAPHIC_BASE
 
 DAY_MAP = {
     'lun': 0, 'lunes': 0,
@@ -13,7 +14,6 @@ DAY_MAP = {
     'dom': 6, 'domingo': 6
 }
 
-MAX_SAFE_BASE = 100
 PRIORITY_LEVELS_LIMIT = 9
 
 
@@ -95,7 +95,7 @@ def generate_sessions_for_group(rows):
     sessions = []
     accumulated_hours = 0.0
     current_date = earliest_start
-    max_date = earliest_start + timedelta(days=365)
+    max_date = earliest_start + timedelta(days=MAX_DAYS_AHEAD)
 
     while accumulated_hours < hours_limit and current_date < max_date:
         wd = current_date.weekday()
@@ -167,10 +167,10 @@ def solve_schedule(df):
         })
 
     num_courses = len(courses_to_solve)
-    num_accounts = 2
+    num_accounts = NUM_ACCOUNTS
 
     if not courses_to_solve:
-        return {'account1': [], 'account2': [], 'unassigned': [], 'conflicts': []}
+        return {f'account{a+1}': [] for a in range(num_accounts)} | {'unassigned': [], 'conflicts': []}
 
     # Build model
     model = cp_model.CpModel()
@@ -201,7 +201,7 @@ def solve_schedule(df):
               f"Reduciendo base para evitar overflow.")
         base = max(2, num_courses + 1)
     else:
-        base = MAX_SAFE_BASE
+        base = LEXICOGRAPHIC_BASE
 
     objective_terms = []
     for i in range(num_courses):
@@ -213,19 +213,19 @@ def solve_schedule(df):
 
     # Solve
     solver = cp_model.CpSolver()
-    solver.parameters.max_time_in_seconds = 60.0
+    solver.parameters.max_time_in_seconds = SOLVER_TIMEOUT
     solver.parameters.log_search_progress = False
     status = solver.Solve(model)
 
     if status == cp_model.INFEASIBLE:
         print("Error: El modelo es infactible. Revisa los datos de entrada.")
-        return {'account1': [], 'account2': [], 'unassigned': [], 'conflicts': []}
+        return {f'account{a+1}': [] for a in range(num_accounts)} | {'unassigned': [], 'conflicts': []}
 
     if status == cp_model.MODEL_INVALID:
         print("Error: El modelo es inválido.")
-        return {'account1': [], 'account2': [], 'unassigned': [], 'conflicts': []}
+        return {f'account{a+1}': [] for a in range(num_accounts)} | {'unassigned': [], 'conflicts': []}
 
-    results = {'account1': [], 'account2': [], 'unassigned': []}
+    results = {f'account{a+1}': [] for a in range(num_accounts)} | {'unassigned': []}
 
     if status == cp_model.OPTIMAL or status == cp_model.FEASIBLE:
         for i in range(num_courses):

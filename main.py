@@ -2,10 +2,11 @@ import pandas as pd
 import sys
 import os
 from model.scheduler import solve_schedule
+from model.config import INPUT_FILE, REQUIRED_COLUMNS, NUM_ACCOUNTS
 
 
 def main():
-    csv_path = os.path.join('data', 'input-courses.csv')
+    csv_path = INPUT_FILE
     if not os.path.exists(csv_path):
         print(f"Error: {csv_path} no encontrado.")
         return
@@ -16,8 +17,6 @@ def main():
         df = pd.read_csv(csv_path, sep=';', encoding='latin-1')
 
     # Validar columnas requeridas
-    REQUIRED_COLUMNS = ['ID Curso', 'Curso', 'Inicio', 'Días',
-                        'Hora inicio', 'Hora fin', 'Horas', 'Prioridad']
     missing = [col for col in REQUIRED_COLUMNS if col not in df.columns]
     if missing:
         print(f"Error: Faltan columnas requeridas: {missing}")
@@ -47,8 +46,9 @@ def main():
     output_lines.append("RESULTADO DE LA OPTIMIZACIÓN")
     output_lines.append("=" * 30)
 
-    for account in ['account1', 'account2']:
-        acc_name = "CUENTA 1" if account == 'account1' else "CUENTA 2"
+    for a in range(NUM_ACCOUNTS):
+        account = f'account{a+1}'
+        acc_name = f"CUENTA {a+1}"
         items = results[account]
         output_lines.append(f"\n{acc_name} ({len(items)} cursos):")
         items.sort(key=lambda x: (x['priority'], x['name']))
@@ -83,7 +83,8 @@ def main():
     # Reporte detallado (opcional con -v o --verbose)
     if '--verbose' in sys.argv or '-v' in sys.argv:
         output_lines.append("\nDETALLE DE SESIONES:")
-        for account in ['account1', 'account2']:
+        for a in range(NUM_ACCOUNTS):
+            account = f'account{a+1}'
             for item in results[account]:
                 sessions = item.get('sessions', [])
                 if sessions:
