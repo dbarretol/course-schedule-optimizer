@@ -2,7 +2,10 @@ import pandas as pd
 from datetime import datetime, timedelta, time
 from ortools.sat.python import cp_model
 import re
+import logging
 from model.config import NUM_ACCOUNTS, SOLVER_TIMEOUT, MAX_DAYS_AHEAD, LEXICOGRAPHIC_BASE
+
+logger = logging.getLogger(__name__)
 
 DAY_MAP = {
     'lun': 0, 'lunes': 0,
@@ -49,8 +52,8 @@ def generate_sessions_for_group(rows):
     unique_hours = rows['Horas'].unique()
     if len(unique_hours) > 1:
         course_name = rows.iloc[0].get('Curso', 'desconocido')
-        print(f"  Advertencia: Curso '{course_name}' tiene valores de Horas "
-              f"inconsistentes: {unique_hours}. Usando el primero: {unique_hours[0]}")
+        logger.warning(f"  Curso '{course_name}' tiene valores de Horas "
+                       f"inconsistentes: {unique_hours}. Usando el primero: {unique_hours[0]}")
 
     # Collect all day/time definitions
     schedules = []
@@ -63,7 +66,7 @@ def generate_sessions_for_group(rows):
             try:
                 row_start_date = datetime.strptime(row['Inicio'].strip(), '%Y-%m-%d').date()
             except ValueError:
-                print(f"  Error: Formato de fecha no reconocido: '{row['Inicio']}'")
+                logger.error(f"  Formato de fecha no reconocido: '{row['Inicio']}'")
                 continue
 
         if earliest_start is None or row_start_date < earliest_start:
@@ -71,16 +74,16 @@ def generate_sessions_for_group(rows):
 
         days = parse_days_simple(row['Días'])
         if not days:
-            print(f"  Advertencia: No se reconocieron días en '{row['Días']}' "
-                  f"para curso '{rows.iloc[0].get('Curso', 'desconocido')}'")
+            logger.warning(f"  No se reconocieron días en '{row['Días']}' "
+                           f"para curso '{rows.iloc[0].get('Curso', 'desconocido')}'")
             continue
 
         try:
             s_time = parse_time_24_simple(row['Hora inicio'])
             e_time = parse_time_24_simple(row['Hora fin'])
         except ValueError as e:
-            print(f"  Error parseando hora para curso "
-                  f"'{rows.iloc[0].get('Curso', 'desconocido')}': {e}")
+            logger.error(f"  Error parseando hora para curso "
+                         f"'{rows.iloc[0].get('Curso', 'desconocido')}': {e}")
             continue
 
         schedules.append({
@@ -197,8 +200,8 @@ def solve_schedule(df):
     max_p = max(c['priority'] for c in courses_to_solve)
 
     if max_p > PRIORITY_LEVELS_LIMIT:
-        print(f"Advertencia: {max_p} niveles de prioridad detectados. "
-              f"Reduciendo base para evitar overflow.")
+        logger.warning(f"{max_p} niveles de prioridad detectados. "
+                       f"Reduciendo base para evitar overflow.")
         base = max(2, num_courses + 1)
     else:
         base = LEXICOGRAPHIC_BASE
@@ -218,11 +221,11 @@ def solve_schedule(df):
     status = solver.Solve(model)
 
     if status == cp_model.INFEASIBLE:
-        print("Error: El modelo es infactible. Revisa los datos de entrada.")
+        logger.error("El modelo es infactible. Revisa los datos de entrada.")
         return {f'account{a+1}': [] for a in range(num_accounts)} | {'unassigned': [], 'conflicts': []}
 
     if status == cp_model.MODEL_INVALID:
-        print("Error: El modelo es inválido.")
+        logger.error("El modelo es inválido.")
         return {f'account{a+1}': [] for a in range(num_accounts)} | {'unassigned': [], 'conflicts': []}
 
     results = {f'account{a+1}': [] for a in range(num_accounts)} | {'unassigned': []}

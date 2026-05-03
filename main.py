@@ -1,14 +1,17 @@
 import pandas as pd
 import sys
 import os
+import logging
 from model.scheduler import solve_schedule
 from model.config import INPUT_FILE, REQUIRED_COLUMNS, NUM_ACCOUNTS
+
+logger = logging.getLogger(__name__)
 
 
 def main():
     csv_path = INPUT_FILE
     if not os.path.exists(csv_path):
-        print(f"Error: {csv_path} no encontrado.")
+        logger.error(f"{csv_path} no encontrado.")
         return
 
     try:
@@ -19,12 +22,12 @@ def main():
     # Validar columnas requeridas
     missing = [col for col in REQUIRED_COLUMNS if col not in df.columns]
     if missing:
-        print(f"Error: Faltan columnas requeridas: {missing}")
-        print(f"Columnas encontradas: {list(df.columns)}")
+        logger.error(f"Faltan columnas requeridas: {missing}")
+        logger.error(f"Columnas encontradas: {list(df.columns)}")
         return
 
     if df.empty:
-        print("Error: El archivo CSV está vacío.")
+        logger.error("El archivo CSV está vacío.")
         return
 
     # Data cleaning
@@ -32,11 +35,11 @@ def main():
     df['Prioridad'] = pd.to_numeric(df['Prioridad'], errors='coerce')
     df = df.dropna(subset=['Curso', 'Horas', 'Prioridad'])
     if df.empty:
-        print("Error: No quedaron datos válidos después de limpiar.")
+        logger.error("No quedaron datos válidos después de limpiar.")
         return
 
-    print("--- Optimizador de Horarios v3 ---")
-    print(f"Cargadas {len(df)} filas de datos.")
+    logger.info("--- Optimizador de Horarios v3 ---")
+    logger.info(f"Cargadas {len(df)} filas de datos.")
 
     results = solve_schedule(df)
 
@@ -98,13 +101,13 @@ def main():
     output_lines.append("\n" + "=" * 30)
 
     report = "\n".join(output_lines)
-    print(report)
+    logger.info("\n" + report)
 
     # Save to data directory
     output_path = os.path.join('data', 'optimization_result.txt')
     with open(output_path, 'w', encoding='utf-8') as f:
         f.write(report)
-    print(f"\nResultado guardado en: {output_path}")
+    logger.info(f"Resultado guardado en: {output_path}")
 
 
 if __name__ == "__main__":

@@ -1,4 +1,15 @@
-# model/config.py
+import logging
+
+# Configuración de logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s [%(levelname)s] %(message)s',
+    handlers=[
+        logging.StreamHandler(),
+        logging.FileHandler('scheduler.log', encoding='utf-8')
+    ]
+)
+
 # archivo de entrada
 INPUT_FILE = 'data/9no_PIT.csv'
 
