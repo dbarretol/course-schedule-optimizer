@@ -1,6 +1,29 @@
 import pandas as pd
-from model.scheduler import generate_sessions_for_group, has_conflict
+import os
+import sys
 from datetime import datetime
+
+# Añadir el directorio raíz al path para poder importar el modelo
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+from model.scheduler import (
+    generate_sessions_for_group, has_conflict, solve_schedule,
+    parse_days_simple, parse_time_24_simple
+)
+
+
+def test_parsing_helpers():
+    """Prueba las funciones auxiliares de parseo."""
+    # Días
+    assert parse_days_simple("Lunes y Miércoles") == [0, 2]
+    assert parse_days_simple("mar, JUE, vie") == [1, 3, 4]
+    assert parse_days_simple("día desconocido") == []
+
+    # Horas
+    from datetime import time
+    assert parse_time_24_simple("09:00") == time(9, 0)
+    assert parse_time_24_simple(" 23:59 ") == time(23, 59)
+    print("✅ test_parsing_helpers pasó")
 
 
 def test_inference_group():
@@ -119,10 +142,74 @@ def test_truncated_last_session():
     print("✅ test_truncated_last_session pasó")
 
 
+def test_solver_priority_and_conflict():
+    """Prueba el solver: prioridad, múltiples cuentas y conflictos."""
+    data = [
+        # Curso A y B chocan. A tiene más prioridad.
+        {'ID Curso': 1, 'Curso': 'Curso A (Alta Prio)',
+         'Inicio': '10/02/2026', 'Días': 'Lunes',
+         'Hora inicio': '09:00', 'Hora fin': '12:00',
+         'Horas': 3, 'Prioridad': 1},
+        {'ID Curso': 2, 'Curso': 'Curso B (Baja Prio)',
+         'Inicio': '10/02/2026', 'Días': 'Lunes',
+         'Hora inicio': '10:00', 'Hora fin': '13:00',
+         'Horas': 3, 'Prioridad': 2},
+        # Curso C no choca con nadie.
+        {'ID Curso': 3, 'Curso': 'Curso C',
+         'Inicio': '10/02/2026', 'Días': 'Martes',
+         'Hora inicio': '09:00', 'Hora fin': '12:00',
+         'Horas': 3, 'Prioridad': 1},
+    ]
+    df = pd.DataFrame(data)
+    results = solve_schedule(df)
+
+    # Verificaciones básicas
+    assigned_ids = []
+    for acc in ['account1', 'account2']:
+        assigned_ids.extend([c['id'] for c in results[acc]])
+
+    # El Curso A (Prio 1) DEBE estar asignado.
+    assert 1 in assigned_ids, "Curso A debe estar asignado por su alta prioridad"
+    # El Curso C (Prio 1) DEBE estar asignado.
+    assert 3 in assigned_ids, "Curso C debe estar asignado (no tiene conflictos)"
+
+    # Verificar que A y B no están en la misma cuenta si ambos se asignaron
+    acc1_ids = [c['id'] for c in results['account1']]
+    acc2_ids = [c['id'] for c in results['account2']]
+
+    if 1 in acc1_ids and 2 in acc1_ids:
+        assert False, "Curso A y B chocan y no pueden estar en la misma cuenta"
+    if 1 in acc2_ids and 2 in acc2_ids:
+        assert False, "Curso A y B chocan y no pueden estar en la misma cuenta"
+
+    # Con 2 cuentas, A, B y C deberían caber (A y C en una, B en otra)
+    assert len(assigned_ids) == 3, f"Se esperaban 3 cursos asignados, hay {len(assigned_ids)}"
+
+    print("✅ test_solver_priority_and_conflict pasó")
+
+
+def test_priority_overflow():
+    """Prueba que el solver maneje niveles de prioridad > 9 sin explotar."""
+    data = [
+        {'ID Curso': 1, 'Curso': 'P1', 'Inicio': '10/02/2026', 'Días': 'Lunes',
+         'Hora inicio': '09:00', 'Hora fin': '10:00', 'Horas': 1, 'Prioridad': 1},
+        {'ID Curso': 2, 'Curso': 'P15', 'Inicio': '10/02/2026', 'Días': 'Lunes',
+         'Hora inicio': '10:00', 'Hora fin': '11:00', 'Horas': 1, 'Prioridad': 15},
+    ]
+    df = pd.DataFrame(data)
+    # No debería lanzar excepción de overflow (potencia demasiado grande)
+    results = solve_schedule(df)
+    assert len(results['account1']) + len(results['account2']) > 0
+    print("✅ test_priority_overflow pasó")
+
+
 if __name__ == "__main__":
+    test_parsing_helpers()
     test_inference_group()
     test_single_day_course()
     test_empty_dataframe()
     test_conflict_detection()
     test_truncated_last_session()
+    test_solver_priority_and_conflict()
+    test_priority_overflow()
     print("\n🎉 Todos los tests pasaron")
