@@ -165,3 +165,42 @@ def test_auto_falls_back_to_staged_when_weights_are_too_large(monkeypatch, caplo
     result = solve(courses, num_accounts=2)
     assert "one priority level at a time" in caplog.text
     assert ids(result.unassigned) == {"low"}
+
+
+def _random_instance(seed, count=30):
+    rng = random.Random(seed)
+    courses = []
+    for n in range(count):
+        hour = rng.randint(8, 18)
+        courses.append(
+            scheduled(
+                make_course(
+                    str(n),
+                    priority=rng.randint(1, 4),
+                    start=date(2026, 3, 2) + timedelta(days=rng.randint(0, 20)),
+                    hours=rng.choice([4, 6, 8]),
+                    slots=[({rng.randint(0, 6)}, f"{hour:02d}:00", f"{hour + 2:02d}:00")],
+                )
+            )
+        )
+    return courses
+
+
+def test_results_are_reproducible():
+    courses = _random_instance(seed=2)
+
+    def layout(result):
+        return [[item.course.course_id for item in account] for account in result.accounts]
+
+    first = layout(solve(courses))
+    assert all(layout(solve(courses)) == first for _ in range(5))
+
+
+def test_first_course_never_goes_to_a_later_account():
+    # Symmetry breaking: accounts are numbered by their lowest course index.
+    courses = _random_instance(seed=3)
+    for num_accounts in (2, 3):
+        result = solve(courses, num_accounts=num_accounts)
+        for index, item in enumerate(courses[:num_accounts]):
+            for account in range(index + 1, num_accounts):
+                assert item not in result.accounts[account]
