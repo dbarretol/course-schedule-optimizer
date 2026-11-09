@@ -1,5 +1,4 @@
 from conftest import make_course, scheduled
-
 from course_scheduler.models import SolveResult, SolveStatus
 from course_scheduler.report import format_report
 
