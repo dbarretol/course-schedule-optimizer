@@ -24,8 +24,9 @@ Two courses clash if any session of one overlaps any session of the other. Sessi
 intervals: $[s_a, e_a)$ and $[s_b, e_b)$ overlap iff $s_a < e_b$ and $s_b < e_a$, so a session that
 ends exactly when another starts is not a clash.
 
-$E$ is the set of clashing course pairs $(i, j)$. Because each course's sessions are sorted,
-checking a pair is a linear merge of both lists.
+$E$ is the set of clashing course pairs $(i, j)$. Checking a pair is one pass over both courses'
+sessions in start order, remembering the latest end seen on each side; this also handles a course
+whose own blocks overlap (two blocks on the same day).
 
 ## 3. CP-SAT model
 
@@ -65,12 +66,23 @@ With very many courses or levels these weights can grow beyond what is safe for 
 constraint $N_1 \ge N_1^*$, maximize $N_2$, and so on, reusing each solution as a hint for the next
 stage. Both methods give the same number of courses per priority.
 
-## 5. Output
+## 5. Symmetry and reproducibility
+
+Accounts are interchangeable, so every assignment has copies that only swap account labels.
+The model numbers accounts by their lowest course index (course $i$ may only use accounts
+$1 \dots i+1$), which removes those copies.
+
+Several assignments can still be equally good. The solver runs its search strategies in a fixed,
+interleaved order instead of racing them in parallel, so the same input always gives the same
+result, provided it finishes within the time limit. For realistic inputs (up to ~50 courses)
+this takes well under two seconds.
+
+## 6. Output
 
 Courses per account, courses left out, and the clashing pairs. With `export-ics`, every session
 becomes an iCalendar event (floating local time, so it appears in your calendar exactly as written).
 
-## Possible extension: balancing accounts
+## 7. Possible extension: balancing accounts
 
 Once priorities are maximized, a second criterion could spread courses evenly, e.g. maximize
 $\min_a n_a$ or minimize $|n_1 - n_2|$. It is not part of the current model.
