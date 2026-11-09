@@ -174,3 +174,9 @@ poetry.toml
 pyrightconfig.json
 
 # End of https://www.toptal.com/developers/gitignore/api/python
+### Project ###
+# Real course data and generated outputs stay local (see examples/ for a sample input)
+data/
+output/
+*.ics
+SESSIONS.csv
