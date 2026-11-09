@@ -180,4 +180,3 @@ data/
 output/
 *.ics
 SESSIONS.csv
-icalc-generator/COURSES.csv
