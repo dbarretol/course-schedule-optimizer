@@ -48,10 +48,22 @@ taken in parallel.
 Let $N_p = \sum_{i : prio_i = p} \sum_a x_{i,a}$ be the number of priority-$p$ courses taken.
 Maximize
 
-$$\max \sum_p W_p N_p \qquad W_1 \gg W_2 \gg \dots$$
+$$\max \sum_p W_p N_p$$
 
 with weights large enough that one course of priority $p$ is worth more than every course of lower
-priority combined.
+priority combined. The smallest such integer weights are computed from the number of courses
+$C_q$ at each level, walking from the least important level upwards:
+
+$$W_p = 1 + \sum_{q \text{ less important than } p} W_q \, C_q$$
+
+For example, with three priority-1 courses, one priority-2 course and two priority-3 courses the
+weights are $W_3 = 1$, $W_2 = 1 + 2 \cdot 1 = 3$ and $W_1 = 1 + 2 \cdot 1 + 1 \cdot 3 = 6$. Only levels
+that occur get a weight, so gaps such as priorities 1, 5 and 15 do not inflate them.
+
+With very many courses or levels these weights can grow beyond what is safe for the solver
+($2^{53}$). In that case the problem is solved **level by level** instead: maximize $N_1$, add the
+constraint $N_1 \ge N_1^*$, maximize $N_2$, and so on, reusing each solution as a hint for the next
+stage. Both methods give the same number of courses per priority.
 
 ## 5. Output
 
