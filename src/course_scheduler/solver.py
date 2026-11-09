@@ -68,9 +68,12 @@ _Outcome = tuple[cp_model.CpSolver, SolveStatus | None]
 _Vars = dict[tuple[int, int], cp_model.IntVar]
 
 
-def _run(model: cp_model.CpModel, timeout_seconds: float) -> _Outcome:
+def _run(model: cp_model.CpModel, timeout_seconds: float, deterministic: bool) -> _Outcome:
     solver = cp_model.CpSolver()
     solver.parameters.max_time_in_seconds = timeout_seconds
+    # Parallel workers race each other, so equally good solutions can differ between runs.
+    # Interleaved search keeps several strategies but runs them in a fixed order.
+    solver.parameters.interleave_search = deterministic
     status = solver.solve(model)
     if _to_status(status) is None:
         logger.error("Solver found no solution (status %s)", solver.status_name(status))
@@ -82,10 +85,11 @@ def _solve_weighted(
     taken: list[cp_model.LinearExpr],
     priorities: list[int],
     timeout_seconds: float,
+    deterministic: bool,
 ) -> _Outcome:
     weights = priority_weights(priorities)
     model.maximize(sum(weights[p] * t for p, t in zip(priorities, taken, strict=True)))
-    return _run(model, timeout_seconds)
+    return _run(model, timeout_seconds, deterministic)
 
 
 def _solve_staged(
@@ -94,6 +98,7 @@ def _solve_staged(
     priorities: list[int],
     x: _Vars,
     timeout_seconds: float,
+    deterministic: bool,
 ) -> _Outcome:
     """Maximize priority-1 courses, lock that count in, then priority 2, and so on."""
     levels = sorted(set(priorities))
@@ -103,7 +108,7 @@ def _solve_staged(
     for level in levels:
         count = sum(t for p, t in zip(priorities, taken, strict=True) if p == level)
         model.maximize(count)
-        solver, status = _run(model, stage_timeout)
+        solver, status = _run(model, stage_timeout, deterministic)
         if status is None:
             return solver, None
         if status is SolveStatus.FEASIBLE:
@@ -122,8 +127,15 @@ def solve(
     num_accounts: int = DEFAULT_ACCOUNTS,
     timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS,
     strategy: Strategy | str = Strategy.AUTO,
+    deterministic: bool = True,
 ) -> SolveResult:
-    """Choose which courses to take and in which account."""
+    """Choose which courses to take and in which account.
+
+    With ``deterministic`` (the default) the same input always gives the same result as
+    long as the solver finishes within ``timeout_seconds``; turning it off lets CP-SAT race
+    parallel workers, which is faster on small inputs but may pick a different one of
+    several equally good assignments on each run.
+    """
     if num_accounts < 1:
         raise ValueError("num_accounts must be at least 1")
     strategy = Strategy(strategy)
@@ -143,6 +155,11 @@ def solve(
     for i, j in conflict_pairs:
         for a in accounts:
             model.add_at_most_one([x[i, a], x[j, a]])
+    # Accounts are interchangeable. Number them by their lowest course index, so course i
+    # can only use accounts 0..i: this removes relabelled copies of every solution.
+    for i in range(min(len(courses), num_accounts)):
+        for a in range(i + 1, num_accounts):
+            model.add(x[i, a] == 0)
 
     priorities = [item.course.priority for item in courses]
     taken = [cp_model.LinearExpr.sum([x[i, a] for a in accounts]) for i in range(len(courses))]
@@ -154,9 +171,9 @@ def solve(
             logger.info("Objective weights too large; solving one priority level at a time")
 
     if strategy is Strategy.WEIGHTED:
-        solver, status = _solve_weighted(model, taken, priorities, timeout_seconds)
+        solver, status = _solve_weighted(model, taken, priorities, timeout_seconds, deterministic)
     else:
-        solver, status = _solve_staged(model, taken, priorities, x, timeout_seconds)
+        solver, status = _solve_staged(model, taken, priorities, x, timeout_seconds, deterministic)
 
     if status is None:
         return SolveResult(SolveStatus.NO_SOLUTION, ((),) * num_accounts, tuple(courses), conflicts)
