@@ -107,6 +107,10 @@ uv run mypy                    # strict type checking of src/
 
 CI runs lint, type checking and the test suite on Linux and Windows with Python 3.12 and 3.13.
 
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md). Release notes are in [CHANGELOG.md](CHANGELOG.md).
+
 ## License
 
 [MIT](LICENSE)
