@@ -39,9 +39,7 @@ def format_report(result: SolveResult, verbose: bool = False) -> str:
 
     if result.conflicts:
         lines.append(f"\nCLASHES ({len(result.conflicts)} pairs):")
-        lines.extend(
-            f"  - {a.course.name} <-> {b.course.name}" for a, b in result.conflicts
-        )
+        lines.extend(f"  - {a.course.name} <-> {b.course.name}" for a, b in result.conflicts)
 
     if verbose:
         lines.append("\nSESSIONS:")

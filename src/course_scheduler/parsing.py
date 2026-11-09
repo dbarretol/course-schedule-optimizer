@@ -19,9 +19,7 @@ _DAY_NAMES: dict[int, tuple[str, ...]] = {
     5: ("saturday", "sat", "sabado", "sab"),
     6: ("sunday", "sun", "domingo", "dom"),
 }
-DAY_LOOKUP: dict[str, int] = {
-    name: index for index, names in _DAY_NAMES.items() for name in names
-}
+DAY_LOOKUP: dict[str, int] = {name: index for index, names in _DAY_NAMES.items() for name in names}
 _DAY_CONNECTORS = frozenset({"and", "y", "e"})
 _DAY_SEPARATORS = re.compile(r"[\s,;/&+.]+")
 

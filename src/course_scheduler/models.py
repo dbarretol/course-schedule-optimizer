@@ -68,7 +68,5 @@ class SolveResult:
     def assigned(self) -> tuple[tuple[int, ScheduledCourse], ...]:
         """``(account_index, course)`` pairs for every assigned course."""
         return tuple(
-            (index, course)
-            for index, courses in enumerate(self.accounts)
-            for course in courses
+            (index, course) for index, courses in enumerate(self.accounts) for course in courses
         )

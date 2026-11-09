@@ -82,7 +82,7 @@ def _solve_weighted(
     timeout_seconds: float,
 ) -> _Outcome:
     weights = priority_weights(priorities)
-    model.maximize(sum(weights[p] * t for p, t in zip(priorities, taken)))
+    model.maximize(sum(weights[p] * t for p, t in zip(priorities, taken, strict=True)))
     return _run(model, timeout_seconds)
 
 
@@ -99,7 +99,7 @@ def _solve_staged(
     overall = SolveStatus.OPTIMAL
     solver = cp_model.CpSolver()
     for level in levels:
-        count = sum(t for p, t in zip(priorities, taken) if p == level)
+        count = sum(t for p, t in zip(priorities, taken, strict=True) if p == level)
         model.maximize(count)
         solver, status = _run(model, stage_timeout)
         if status is None:
@@ -109,7 +109,7 @@ def _solve_staged(
         best = round(solver.objective_value)
         logger.debug("Priority %d: %d courses", level, best)
         model.add(count >= best)
-        model.clear_hints()
+        model.clear_hints()  # type: ignore[no-untyped-call]
         for var in x.values():
             model.add_hint(var, solver.value(var))
     return solver, overall
@@ -135,11 +135,7 @@ def solve(
 
     model = cp_model.CpModel()
     accounts = range(num_accounts)
-    x = {
-        (i, a): model.new_bool_var(f"x_{i}_{a}")
-        for i in range(len(courses))
-        for a in accounts
-    }
+    x = {(i, a): model.new_bool_var(f"x_{i}_{a}") for i in range(len(courses)) for a in accounts}
     for i in range(len(courses)):
         model.add_at_most_one([x[i, a] for a in accounts])
     for i, j in conflict_pairs:
@@ -147,7 +143,7 @@ def solve(
             model.add_at_most_one([x[i, a], x[j, a]])
 
     priorities = [item.course.priority for item in courses]
-    taken = [sum(x[i, a] for a in accounts) for i in range(len(courses))]
+    taken = [cp_model.LinearExpr.sum([x[i, a] for a in accounts]) for i in range(len(courses))]
 
     if strategy is Strategy.AUTO:
         too_big = max_objective(priority_weights(priorities), priorities) > MAX_WEIGHTED_OBJECTIVE
@@ -161,9 +157,7 @@ def solve(
         solver, status = _solve_staged(model, taken, priorities, x, timeout_seconds)
 
     if status is None:
-        return SolveResult(
-            SolveStatus.NO_SOLUTION, ((),) * num_accounts, tuple(courses), conflicts
-        )
+        return SolveResult(SolveStatus.NO_SOLUTION, ((),) * num_accounts, tuple(courses), conflicts)
     if status is SolveStatus.FEASIBLE:
         logger.warning("Time limit reached; the solution may not be optimal")
 
