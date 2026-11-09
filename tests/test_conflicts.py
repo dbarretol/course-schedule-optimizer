@@ -1,7 +1,6 @@
 from datetime import datetime
 
 from conftest import make_course, scheduled
-
 from course_scheduler.conflicts import find_conflicts, sessions_overlap
 from course_scheduler.models import Session
 

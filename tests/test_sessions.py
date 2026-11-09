@@ -1,8 +1,9 @@
 from datetime import date, datetime
+from itertools import pairwise
 
 import pytest
-from conftest import make_course
 
+from conftest import make_course
 from course_scheduler.sessions import generate_sessions
 
 
@@ -22,7 +23,7 @@ def test_two_slots_per_week_reach_total_hours():
     assert len(sessions) == 4
     assert {s.start.weekday() for s in sessions} == {1, 3}
     assert all(s.end > s.start for s in sessions)
-    assert all(a.end <= b.start for a, b in zip(sessions, sessions[1:]))
+    assert all(a.end <= b.start for a, b in pairwise(sessions))
 
 
 def test_single_day_course():

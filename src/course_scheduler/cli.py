@@ -52,33 +52,43 @@ def build_parser() -> argparse.ArgumentParser:
 
     solver_options = argparse.ArgumentParser(add_help=False)
     solver_options.add_argument(
-        "--accounts", type=_positive_int, default=DEFAULT_ACCOUNTS,
+        "--accounts",
+        type=_positive_int,
+        default=DEFAULT_ACCOUNTS,
         help=f"number of accounts (default: {DEFAULT_ACCOUNTS})",
     )
     solver_options.add_argument(
-        "--timeout", type=_positive_float, default=DEFAULT_TIMEOUT_SECONDS,
+        "--timeout",
+        type=_positive_float,
+        default=DEFAULT_TIMEOUT_SECONDS,
         help=f"solver time limit in seconds (default: {DEFAULT_TIMEOUT_SECONDS:g})",
     )
 
     commands = parser.add_subparsers(dest="command", required=True)
 
     solve_cmd = commands.add_parser(
-        "solve", parents=[common, solver_options],
+        "solve",
+        parents=[common, solver_options],
         help="choose courses and assign them to accounts",
     )
     solve_cmd.add_argument("-o", "--output", type=Path, help="also write the report here")
 
     export_cmd = commands.add_parser(
-        "export-ics", parents=[common, solver_options],
+        "export-ics",
+        parents=[common, solver_options],
         help="export course sessions to an iCalendar file",
     )
     export_cmd.add_argument(
-        "-o", "--output", type=Path, default=Path("calendar.ics"),
+        "-o",
+        "--output",
+        type=Path,
+        default=Path("calendar.ics"),
         help="calendar file (default: calendar.ics)",
     )
     export_cmd.add_argument("--sessions-csv", type=Path, help="also write sessions as CSV")
     export_cmd.add_argument(
-        "--assigned-only", action="store_true",
+        "--assigned-only",
+        action="store_true",
         help="solve first and export only assigned courses, tagged with their account",
     )
     return parser

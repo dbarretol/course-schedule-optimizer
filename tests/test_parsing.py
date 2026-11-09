@@ -47,9 +47,7 @@ def test_parse_time():
         parse_time("25:00")
 
 
-@pytest.mark.parametrize(
-    "text", ["10/02/2026", "2026-02-10", "10/2/2026", " 10/02/2026 "]
-)
+@pytest.mark.parametrize("text", ["10/02/2026", "2026-02-10", "10/2/2026", " 10/02/2026 "])
 def test_parse_date(text):
     assert parse_date(text) == date(2026, 2, 10)
 

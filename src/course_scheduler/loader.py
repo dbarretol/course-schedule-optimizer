@@ -15,6 +15,7 @@ import csv
 import io
 import logging
 import re
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
@@ -89,6 +90,58 @@ class _CourseDraft:
     slots: list[TimeSlot] = field(default_factory=list)
 
 
+@dataclass(frozen=True, slots=True)
+class _Row:
+    course_id: str
+    name: str
+    start_date: date
+    slot: TimeSlot
+    total_hours: float
+    priority: int
+
+
+def _parse_field[T](
+    values: dict[str, str], column: str, parser: Callable[[str], T], where: str, errors: list[str]
+) -> T | None:
+    try:
+        return parser(values[column])
+    except ValueError as exc:
+        errors.append(f"{where}: {column}: {exc}")
+        return None
+
+
+def _parse_row(values: dict[str, str], where: str) -> tuple[_Row | None, list[str]]:
+    """Parse one data row; returns the row, or ``None`` and the list of its problems."""
+    errors: list[str] = []
+    course_id, name = values["course_id"], values["name"]
+    if not course_id:
+        errors.append(f"{where}: course_id: empty")
+    if not name:
+        errors.append(f"{where}: name: empty")
+    start_date = _parse_field(values, "start_date", parse_date, where, errors)
+    days = _parse_field(values, "days", parse_days, where, errors)
+    start_time = _parse_field(values, "start_time", parse_time, where, errors)
+    end_time = _parse_field(values, "end_time", parse_time, where, errors)
+    total_hours = _parse_field(values, "total_hours", parse_hours, where, errors)
+    priority = _parse_field(values, "priority", parse_priority, where, errors)
+    if start_time is not None and end_time is not None and end_time <= start_time:
+        errors.append(
+            f"{where}: end_time {values['end_time']} is not after start_time {values['start_time']}"
+        )
+    if (
+        errors
+        or start_date is None
+        or days is None
+        or start_time is None
+        or end_time is None
+        or total_hours is None
+        or priority is None
+    ):
+        return None, errors
+    slot = TimeSlot(days, start_time, end_time)
+    return _Row(course_id, name, start_date, slot, total_hours, priority), []
+
+
 def load_courses(path: str | Path, delimiter: str = ";") -> list[Course]:
     """Read ``path`` and return its courses in order of first appearance.
 
@@ -128,66 +181,44 @@ def parse_courses(text: str, delimiter: str = ";", source: str = "<input>") -> l
     errors: list[str] = []
     drafts: dict[str, _CourseDraft] = {}
 
-    for line_number, row in enumerate(reader, start=2):
-        if not any(cell.strip() for cell in row):
+    for line_number, cells in enumerate(reader, start=2):
+        if not any(cell.strip() for cell in cells):
             continue
         where = f"{source}:{line_number}"
         values = {
-            column: row[index].strip() if index < len(row) else ""
+            column: cells[index].strip() if index < len(cells) else ""
             for column, index in positions.items()
         }
-        row_errors: list[str] = []
-
-        def field_value(column: str, parser, values=values, row_errors=row_errors):
-            try:
-                return parser(values[column])
-            except ValueError as exc:
-                row_errors.append(f"{where}: {column}: {exc}")
-                return None
-
-        course_id = values["course_id"]
-        name = values["name"]
-        if not course_id:
-            row_errors.append(f"{where}: course_id: empty")
-        if not name:
-            row_errors.append(f"{where}: name: empty")
-        start_date = field_value("start_date", parse_date)
-        days = field_value("days", parse_days)
-        start_time = field_value("start_time", parse_time)
-        end_time = field_value("end_time", parse_time)
-        total_hours = field_value("total_hours", parse_hours)
-        priority = field_value("priority", parse_priority)
-        if start_time is not None and end_time is not None and end_time <= start_time:
-            row_errors.append(
-                f"{where}: end_time {values['end_time']} is not after "
-                f"start_time {values['start_time']}"
-            )
-
-        if row_errors:
+        row, row_errors = _parse_row(values, where)
+        if row is None:
             errors.extend(row_errors)
             continue
 
-        draft = drafts.get(course_id)
+        draft = drafts.get(row.course_id)
         if draft is None:
-            draft = drafts[course_id] = _CourseDraft(
-                course_id, name, priority, total_hours, line_number
+            draft = drafts[row.course_id] = _CourseDraft(
+                row.course_id, row.name, row.priority, row.total_hours, line_number
             )
         else:
-            if name != draft.name or priority != draft.priority:
+            if row.name != draft.name or row.priority != draft.priority:
                 errors.append(
-                    f"{where}: course {course_id} has name/priority "
-                    f"{name!r}/{priority}, but line {draft.first_line} says "
+                    f"{where}: course {row.course_id} has name/priority "
+                    f"{row.name!r}/{row.priority}, but line {draft.first_line} says "
                     f"{draft.name!r}/{draft.priority}"
                 )
                 continue
-            if total_hours != draft.total_hours:
+            if row.total_hours != draft.total_hours:
                 logger.warning(
                     "%s: course %s has total_hours %s, but line %d says %s; using %s",
-                    where, course_id, total_hours, draft.first_line,
-                    draft.total_hours, draft.total_hours,
+                    where,
+                    row.course_id,
+                    row.total_hours,
+                    draft.first_line,
+                    draft.total_hours,
+                    draft.total_hours,
                 )
-        draft.start_dates.append(start_date)
-        draft.slots.append(TimeSlot(days, start_time, end_time))
+        draft.start_dates.append(row.start_date)
+        draft.slots.append(row.slot)
 
     if errors:
         raise InputError(errors)

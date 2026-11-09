@@ -15,7 +15,11 @@ course-scheduler = "course_scheduler.cli:main"
 
 [dependency-groups]
 dev = [
+    "mypy>=2.4.1",
+    "pre-commit>=4.7.0",
     "pytest>=8.3",
+    "pytest-cov>=7.1.0",
+    "ruff>=0.17.4",
 ]
 
 [build-system]
@@ -28,3 +32,39 @@ packages = ["src/course_scheduler"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra"
+
+[tool.coverage.run]
+source = ["course_scheduler"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+fail_under = 90
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = [
+    "E", "W",  # pycodestyle
+    "F",       # pyflakes
+    "I",       # isort
+    "UP",      # pyupgrade
+    "B",       # bugbear
+    "SIM",     # simplify
+    "C4",      # comprehensions
+    "PTH",     # prefer pathlib
+    "RUF",     # ruff-specific
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["course_scheduler", "conftest"]
+
+[tool.mypy]
+python_version = "3.12"
+files = ["src"]
+strict = true
+warn_unreachable = true

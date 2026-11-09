@@ -1,5 +1,7 @@
 # course-schedule-optimizer
 
+[![CI](https://github.com/dbarretol/course-schedule-optimizer/actions/workflows/ci.yml/badge.svg)](https://github.com/dbarretol/course-schedule-optimizer/actions/workflows/ci.yml)
+
 Pick the best set of courses when you can enroll through several accounts.
 
 Some course platforms refuse to enroll one account in two courses whose schedules clash, but
@@ -95,9 +97,14 @@ See [docs/model.md](docs/model.md) for the optimization model.
 ## Development
 
 ```bash
-uv sync
-uv run pytest
+uv sync                        # install the package and dev tools
+uv run pre-commit install      # run ruff and mypy on every commit
+uv run pytest --cov            # tests with coverage (minimum 90%)
+uv run ruff check . && uv run ruff format --check .
+uv run mypy                    # strict type checking of src/
 ```
+
+CI runs lint, type checking and the test suite on Linux and Windows with Python 3.12 and 3.13.
 
 ## License
 

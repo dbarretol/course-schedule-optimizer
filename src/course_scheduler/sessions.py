@@ -45,8 +45,11 @@ def generate_sessions(course: Course, max_days: int = MAX_DAYS_AHEAD) -> tuple[S
     if remaining > _EPSILON_HOURS:
         logger.warning(
             "Course %s (%s): only %.2f of %.2f hours fit within %d days",
-            course.course_id, course.name, course.total_hours - remaining,
-            course.total_hours, max_days,
+            course.course_id,
+            course.name,
+            course.total_hours - remaining,
+            course.total_hours,
+            max_days,
         )
     return tuple(sessions)
 
