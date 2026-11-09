@@ -1,22 +1,51 @@
 # course-schedule-optimizer
 
 [![CI](https://github.com/dbarretol/course-schedule-optimizer/actions/workflows/ci.yml/badge.svg)](https://github.com/dbarretol/course-schedule-optimizer/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue.svg)
 
-Pick the best set of courses when you can enroll through several accounts.
+**Pick the best set of courses when you can enroll through more than one account.**
 
-Some course platforms refuse to enroll one account in two courses whose schedules clash, but
-nothing stops you from using a second account. Given a list of courses with their weekly
-schedules and your priorities, this tool:
+Many course platforms refuse to enroll one account in two courses whose schedules clash, but
+nothing stops you from enrolling a second account in the other one. Recorded classes make this
+common: you can follow two live schedules at once and watch one of them later.
 
-1. expands every course into its real sessions (start date, weekdays, hours per block, total hours);
-2. finds every pair of courses that clash;
-3. uses [OR-Tools CP-SAT](https://developers.google.com/optimization/cp/cp_solver) to assign
-   courses to accounts with **no clash inside an account**, taking as many priority-1 courses
-   as possible, then as many priority-2 courses as possible, and so on (the same input always
-   gives the same result);
-4. optionally exports the sessions to an iCalendar (`.ics`) file for Google Calendar, Outlook, etc.
+Give this tool a CSV with your candidate courses, their schedules and how much you want each one.
+It tells you which courses to take with each account so that **no account has a clash** and as
+many high-priority courses as possible fit. It can also put the result in your calendar.
 
-## Installation
+- [The idea in one picture](#the-idea-in-one-picture)
+- [Quick start](#quick-start)
+- [Writing your course file](#writing-your-course-file)
+- [Commands](#commands)
+- [How it works](#how-it-works)
+- [Limitations](#limitations)
+- [Contributing](#contributing)
+
+## The idea in one picture
+
+Three courses overlap on Monday evening. One account could take only one of them; with two
+accounts you can take two, and the tool keeps the two with the highest priority:
+
+```mermaid
+gantt
+    title Monday evening, two accounts
+    dateFormat HH:mm
+    axisFormat %H:%M
+    section Account 1
+    Intro to Python · priority 1     :done, 18:00, 21:00
+    section Account 2
+    Data Visualization · priority 2  :done, 19:00, 22:00
+    section Not taken
+    Public Speaking · priority 4     :crit, 20:00, 22:00
+```
+
+*Public Speaking clashes with both accounts, and it has the lowest priority, so it is left out.*
+
+Priorities are strict: the tool never gives up a priority-1 course to fit any number of
+lower-priority ones. Among equally good choices it always returns the same answer.
+
+## Quick start
 
 Requires Python 3.12+ and [uv](https://docs.astral.sh/uv/).
 
@@ -24,28 +53,10 @@ Requires Python 3.12+ and [uv](https://docs.astral.sh/uv/).
 git clone https://github.com/dbarretol/course-schedule-optimizer.git
 cd course-schedule-optimizer
 uv sync
-```
-
-## Usage
-
-```bash
-# Assign courses to 2 accounts (default) and print the report
 uv run course-scheduler solve examples/courses.sample.csv
-
-# 3 accounts, 30 s time limit, save the report, list sessions per course
-uv run course-scheduler solve my-courses.csv --accounts 3 --timeout 30 -o result.txt -v
-
-# Calendar with every course in the file
-uv run course-scheduler export-ics my-courses.csv -o calendar.ics
-
-# Calendar with only the courses the optimizer picked, tagged by account, plus a CSV of sessions
-uv run course-scheduler export-ics my-courses.csv --assigned-only -o calendar.ics --sessions-csv sessions.csv
 ```
 
-Run `uv run course-scheduler --help` or `uv run course-scheduler <command> --help` for all options.
-Exit codes: `0` success, `1` the solver found no solution within the time limit, `2` invalid input.
-
-### Example output
+Output (abridged):
 
 ```text
 ACCOUNT 1 (4 courses):
@@ -61,51 +72,116 @@ ACCOUNT 2 (3 courses):
 
 UNASSIGNED COURSES (1):
   [8] Public Speaking (priority 4)
+
+CLASHES (5 pairs):
+  - Intro to Python <-> Data Visualization
+  - Intro to Python <-> Git Workshop
+  ...
 ```
 
-## Input format
+Then export the chosen courses to a calendar you can import into Google Calendar, Outlook or
+Apple Calendar:
 
-A `;`-separated CSV, UTF-8 or Windows-1252. See [`examples/courses.sample.csv`](examples/courses.sample.csv).
+```bash
+uv run course-scheduler export-ics examples/courses.sample.csv --assigned-only -o calendar.ics
+```
+
+## Writing your course file
+
+A `;`-separated CSV (UTF-8 or Windows-1252), one row per weekly block. This is
+[`examples/courses.sample.csv`](examples/courses.sample.csv):
 
 ```text
 course_id;name;start_date;days;start_time;end_time;total_hours;priority
 1;Intro to Python;02/03/2026;Monday, Wednesday;18:00;21:00;24;1
+2;SQL Fundamentals;03/03/2026;Tuesday;19:00;22:00;12;1
+3;Data Visualization;02/03/2026;Monday;19:00;22:00;15;2
+4;Linux Basics;07/03/2026;Saturday;09:00;13:00;16;2
+5;Cloud Essentials;07/03/2026;Saturday;11:00;14:00;12;3
 6;Project Management;05/03/2026;Thursday;18:00;20:00;10;3
 6;Project Management;05/03/2026;Friday;18:00;21:00;10;3
+7;Git Workshop;04/03/2026;Wednesday;19:30;21:30;5;4
+8;Public Speaking;02/03/2026;Monday;20:00;22:00;8;4
 ```
 
-| Column | Meaning |
-|---|---|
-| `course_id` | Identifier. Rows with the same id are one course with several weekly blocks. |
-| `name` | Course name. |
-| `start_date` | Date of the first class: `DD/MM/YYYY` or `YYYY-MM-DD`. |
-| `days` | Weekdays of this block, e.g. `Monday, Wednesday and Friday` or `Mon/Wed`. |
-| `start_time`, `end_time` | Block time, 24-hour `HH:MM`. |
-| `total_hours` | Total course length in hours (not the number of sessions). The last session is shortened if needed. |
-| `priority` | Positive integer; `1` is the most important. |
+| Column | Meaning | Example |
+|---|---|---|
+| `course_id` | Identifier. Rows sharing an id are **one course** with several weekly blocks (see course 6). | `6` |
+| `name` | Course name. | `Project Management` |
+| `start_date` | Date of the first class, `DD/MM/YYYY` or `YYYY-MM-DD`. | `05/03/2026` |
+| `days` | Weekdays of this block. Separate with `,`, `/` or `and`; full or short names. | `Monday, Wednesday` · `Mon/Wed` |
+| `start_time`, `end_time` | Time of this block, 24-hour `HH:MM`. | `18:00` |
+| `total_hours` | Length of the whole course in hours, **not** the number of classes. | `24` |
+| `priority` | Positive integer; `1` is the most wanted. | `1` |
 
-Sessions are generated from `start_date` onwards until `total_hours` is reached. A session that ends
-exactly when another starts is not a clash. All rows of one course must share `name` and
-`priority`; invalid rows are reported with their line number.
+How the file is read:
 
-> Spanish headers (`ID Curso;Curso;Inicio;Días;Hora inicio;Hora fin;Horas;Prioridad`) and Spanish
-> day names (`Lunes y Miércoles`) are also accepted.
+- Classes are generated from `start_date` onwards, block by block, until `total_hours` is
+  reached; the last class is shortened if needed. *Intro to Python* (24 h, Monday and Wednesday
+  18:00–21:00) becomes 8 classes.
+- A class that ends exactly when another starts is **not** a clash.
+- All rows of one course must have the same `name` and `priority`.
+- If anything is wrong, nothing is solved: every problem is listed with its line number.
+
+> Spanish headers (`ID Curso;Curso;Inicio;Días;Hora inicio;Hora fin;Horas;Prioridad`) and
+> Spanish day names (`Lunes y Miércoles`) are accepted too.
+
+## Commands
+
+```bash
+uv run course-scheduler solve      COURSES.csv [options]   # choose courses per account
+uv run course-scheduler export-ics COURSES.csv [options]   # write an .ics calendar
+```
+
+| Option | Commands | Default | Description |
+|---|---|---|---|
+| `--accounts N` | both | `2` | Number of accounts. |
+| `--timeout S` | both | `60` | Solver time limit in seconds. |
+| `-o PATH`, `--output PATH` | both | none / `calendar.ics` | Also save the report (`solve`) or the calendar file (`export-ics`). |
+| `-v`, `--verbose` | both | off | `solve` also shows, per chosen course, its number of classes and first/last date; more detailed logs. |
+| `--assigned-only` | `export-ics` | off | Export only the courses chosen by `solve`, tagged *Account 1*, *Account 2*… |
+| `--sessions-csv PATH` | `export-ics` | none | Also write one CSV row per class. |
+| `--delimiter C` | both | `;` | CSV delimiter. |
+| `--log-file PATH` | both | none | Also write logs to a file. |
+
+Exit codes: `0` success · `1` no solution found within the time limit · `2` invalid input.
+Run `uv run course-scheduler <command> --help` for details.
 
 ## How it works
 
-See [docs/model.md](docs/model.md) for the optimization model.
-
-## Development
-
-```bash
-uv sync                        # install the package and dev tools
-uv run pre-commit install      # run ruff and mypy on every commit
-uv run pytest --cov            # tests with coverage (minimum 90%)
-uv run ruff check . && uv run ruff format --check .
-uv run mypy                    # strict type checking of src/
+```mermaid
+flowchart LR
+    A[/"courses.csv"/] --> B["Read and validate<br/>every row"]
+    B --> C["Expand each course<br/>into its classes"]
+    C --> D["Find every pair of<br/>courses that clash"]
+    D --> E["CP-SAT solver<br/>no clash inside an account<br/>priority 1 first, then 2, ..."]
+    E --> F[/"Report:<br/>courses per account"/]
+    E --> G[/"calendar.ics"/]
 ```
 
-CI runs lint, type checking and the test suite on Linux and Windows with Python 3.12 and 3.13.
+1. **Read**: each row is checked (dates, days, times, hours, priority) and rows with the same
+   `course_id` are merged into one course.
+2. **Expand**: weekly blocks become dated classes until the course's total hours are covered.
+3. **Clash**: two courses clash if any class of one overlaps any class of the other.
+4. **Solve**: [Google OR-Tools CP-SAT](https://developers.google.com/optimization/cp/cp_solver)
+   assigns each course to at most one account, never putting two clashing courses in the same
+   account, and maximizes priority-1 courses first, then priority 2, and so on.
+5. **Output**: a text report, and optionally an iCalendar file.
+
+The mathematical model, including how the priority weights are chosen, is described in
+[docs/model.md](docs/model.md).
+
+## Limitations
+
+- Designed for personal use: up to ~50 courses solve within about a second.
+- Times are written to the calendar as local times without a time zone, exactly as in the CSV.
+- Every class of a course is assumed to need the same account; a course cannot be split.
+- Priorities are strict. There is no "two priority-2 courses are worth one priority-1" trade-off.
+
+## Contributing
+
+Bug reports and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for the
+development setup and checks, and [CHANGELOG.md](CHANGELOG.md) for release notes.
 
 ## License
 
