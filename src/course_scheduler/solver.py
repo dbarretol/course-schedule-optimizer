@@ -54,7 +54,9 @@ def max_objective(weights: dict[int, int], priorities: Iterable[int]) -> int:
     return sum(weights[p] for p in priorities)
 
 
-def _to_status(status: int) -> SolveStatus | None:
+def _to_status(status: object) -> SolveStatus | None:
+    # ``CpSolver.solve`` is annotated as returning the protobuf enum, which type checkers
+    # resolve differently per platform (int on some, an enum wrapper on others).
     if status == cp_model.OPTIMAL:
         return SolveStatus.OPTIMAL
     if status == cp_model.FEASIBLE:
