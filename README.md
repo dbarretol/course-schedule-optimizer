@@ -12,7 +12,8 @@ schedules and your priorities, this tool:
 2. finds every pair of courses that clash;
 3. uses [OR-Tools CP-SAT](https://developers.google.com/optimization/cp/cp_solver) to assign
    courses to accounts with **no clash inside an account**, taking as many priority-1 courses
-   as possible, then as many priority-2 courses as possible, and so on;
+   as possible, then as many priority-2 courses as possible, and so on (the same input always
+   gives the same result);
 4. optionally exports the sessions to an iCalendar (`.ics`) file for Google Calendar, Outlook, etc.
 
 ## Installation
