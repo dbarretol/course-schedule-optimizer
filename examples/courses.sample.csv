@@ -1,0 +1,10 @@
+course_id;name;start_date;days;start_time;end_time;total_hours;priority
+1;Intro to Python;02/03/2026;Monday, Wednesday;18:00;21:00;24;1
+2;SQL Fundamentals;03/03/2026;Tuesday;19:00;22:00;12;1
+3;Data Visualization;02/03/2026;Monday;19:00;22:00;15;2
+4;Linux Basics;07/03/2026;Saturday;09:00;13:00;16;2
+5;Cloud Essentials;07/03/2026;Saturday;11:00;14:00;12;3
+6;Project Management;05/03/2026;Thursday;18:00;20:00;10;3
+6;Project Management;05/03/2026;Friday;18:00;21:00;10;3
+7;Git Workshop;04/03/2026;Wednesday;19:30;21:30;5;4
+8;Public Speaking;02/03/2026;Monday;20:00;22:00;8;4
