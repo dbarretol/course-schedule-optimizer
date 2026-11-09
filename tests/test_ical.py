@@ -2,7 +2,6 @@ import csv
 from datetime import UTC, datetime
 
 from conftest import make_course, scheduled
-
 from course_scheduler.ical import build_calendar, write_sessions_csv
 
 NOW = datetime(2026, 1, 1, 12, 0, tzinfo=UTC)

@@ -27,7 +27,15 @@ def test_export_ics_assigned_only(sample_csv, tmp_path):
     ics = tmp_path / "out.ics"
     sessions = tmp_path / "sessions.csv"
     code = main(
-        ["export-ics", str(sample_csv), "-o", str(ics), "--sessions-csv", str(sessions), "--assigned-only"]
+        [
+            "export-ics",
+            str(sample_csv),
+            "-o",
+            str(ics),
+            "--sessions-csv",
+            str(sessions),
+            "--assigned-only",
+        ]
     )
     assert code == EXIT_OK
     text = ics.read_text(encoding="utf-8")

@@ -4,8 +4,8 @@ from collections import Counter
 from datetime import date, timedelta
 
 import pytest
-from conftest import make_course, scheduled
 
+from conftest import make_course, scheduled
 from course_scheduler import solver as solver_module
 from course_scheduler.models import SolveStatus
 from course_scheduler.solver import Strategy, priority_weights, solve
@@ -56,7 +56,11 @@ def test_lowest_priority_is_dropped_in_a_three_way_clash():
 def test_one_high_priority_beats_many_low_priority():
     high = scheduled(make_course("high", priority=1, slots=[({0}, "09:00", "18:00")], hours=9))
     lows = [
-        scheduled(make_course(f"low{i}", priority=2, slots=[({0}, f"{9 + i:02d}:00", f"{10 + i:02d}:00")], hours=1))
+        scheduled(
+            make_course(
+                f"low{i}", priority=2, slots=[({0}, f"{9 + i:02d}:00", f"{10 + i:02d}:00")], hours=1
+            )
+        )
         for i in range(5)
     ]
     result = solve([high, *lows], num_accounts=1)
@@ -112,7 +116,11 @@ def test_more_than_100_lower_priority_courses_never_beat_one_higher():
     every_day = [(set(range(7)), "09:00", "10:00")]
     high = scheduled(make_course("high", priority=1, start=start, hours=101, slots=every_day))
     lows = [
-        scheduled(make_course(f"low{k}", priority=2, start=start + timedelta(days=k), hours=1, slots=every_day))
+        scheduled(
+            make_course(
+                f"low{k}", priority=2, start=start + timedelta(days=k), hours=1, slots=every_day
+            )
+        )
         for k in range(101)
     ]
     result = solve([high, *lows], num_accounts=1, strategy=Strategy.WEIGHTED)
